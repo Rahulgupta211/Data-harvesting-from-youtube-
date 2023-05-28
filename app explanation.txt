@@ -1,101 +1,105 @@
-import streamlit as st
+Data harvesting project steps for retrieval of youtube data.
 
-import mysql.connector
-
-import pymongo
-
-import sqlalchemy
-
-from sqlalchemy import create_engine
-
-API_KEY='AIzaSyBuygZvIp_khy8Oy8keStwxjokXillcxw4'
-
+Packages that needed to be installed and that has to be imported-
+pip install --upgrade google-api-python-client#package that needs to be installed for the retrieval of youtube data
+pip install --upgrade google-auth-oauthlib google-auth-httplib2#youtube data package
+from googleapiclient.discovery import build
+pip install streamlit#for the application
+pip install sqlalchemy#for the migration of data to sql
+pip install mysql.connector#for the interfacing mysql
+pip install pymongo#for interfacing pymongo
 import pandas as pd
-
-conn=pymongo.MongoClient("mongodb+srv://duvidsm3:ronaldo19857@cluster0.gzzcm1z.mongodb.net/?retryWrites=true&w=majority")
-
-conn_sql=sqlalchemy.create_engine('mysql+mysqlconnector://root:rahul@localhost:3306/youtube')
-
+import streamlit as st
+import mysql.connector
+import pymongo
+import sqlalchemy
+from sqlalchemy import create_engine
 from googleapiclient.discovery import build
 
-api_service_name = "youtube"
+API_KEY='AIzaSyBuygZvIp_khy8Oy8keStwxjokXillcxw4'#login to youtube data api and generate a key for the retrieval of data
 
-api_version = "v3"
+conn=pymongo.MongoClient("mongodb+srv://duvidsm3:ronaldo19857@cluster0.gzzcm1z.mongodb.net/?retryWrites=true&w=majority")#creating a connection between python and mongo db
 
-youtube=build(api_service_name,api_version,developerKey=API_KEY)
+conn_sql=sqlalchemy.create_engine('mysql+mysqlconnector://root:rahul@localhost:3306/youtube')#creating a connection between sql and python
 
-sample=conn['youtube']
+api_service_name = "youtube"##declaring api name
 
-channel_id=st.text_input('enter channel id')
+api_version = "v3"#declaring its version
 
-def channel_details(youtube,channel_id):
+youtube=build(api_service_name,api_version,developerKey=API_KEY)#importing build for the retrieval of the youtube data
+
+sample=conn['youtube']#defining a variable for the connection to mongo db
+
+channel_id=st.text_input('enter channel id')#input a single channel if you want you can input multiple channel id's but it would exhaust your api attempt and would lag the streamlit application 
+                     #predefined=youtube,channel_id is input    
+1)def channel_details(youtube,channel_id):
     
-    all_data=[]
-    request = youtube.channels().list(part="snippet,contentDetails,statistics",id=channel_id)
-    response = request.execute()
-    coll=sample['channel']
-    for item in response['items']:
-        data=dict(channel_name=item['snippet']['title'],
-                    channel_id=item['id'],
-                    subscribers_count=item['statistics']['subscriberCount'],
-                    channel_views=item['statistics']['viewCount'],
-                    channel_description = item['snippet']['description'],
-                    total_videos= item['statistics']['videoCount'],
-                    channel_creation_date=item['snippet']['publishedAt'],
+    all_data=[]#declaring a list to append the data after the loop
+    request = youtube.channels().list(part="snippet,contentDetails,statistics",id=channel_id)#creating a request to retrieve the channel details with the help of youtube api
+    response = request.execute()#storing it in response the result we got from api
+    coll=sample['channel']#creating a variable so to insert the data into mongo db
+    for item in response['items']:#looping through the response and taking only the values we need in dict format
+        data=dict(channel_name=item['snippet']['title'],#name of channel
+                    channel_id=item['id'],#channel_id
+                    subscribers_count=item['statistics']['subscriberCount'],#no of subscribers
+                    channel_views=item['statistics']['viewCount'],#no of views till now
+                    channel_description = item['snippet']['description'],#channe;l description
+                    total_videos= item['statistics']['videoCount'],#no of videos till now
+                    channel_creation_date=item['snippet']['publishedAt'],#when was channel created
                     playlist_id=item['contentDetails']['relatedPlaylists']['uploads'])
-        coll.insert_one(data)
-        all_data.append(data)
-    df=pd.DataFrame(all_data)
-    #df['channel_creation_date']=pd.to_datetime(df['channel_creation_date'])
-    return df
+        coll.insert_one(data)#insering the data in mongo db
+        all_data.append(data)#appending it to var
+    df=pd.DataFrame(all_data)#converting it to pd dataframe
+    #df['channel_creation_date']=pd.to_datetime(df['channel_creation_date']#if you want you can convert it datetime format and display it
+    return df#returning the dataframe
+##def channel_details(youtube,channel_id)-we can use this function for the retrieval of data and displaying the stats and sending it simulltaneously to mongodb
 
 
-
-def youtube_data_sql(channel_id):
+2)def youtube_data_sql(channel_id):
     re=[]
     a='Sucessful'
     #sample=conn['youtube']
-    coll_var=sample.channel
-    for i in coll_var.find({"channel_id":channel_id}):
+    coll_var=sample.channel#calling out the channel where from mongo where data is stored
+    for i in coll_var.find({"channel_id":channel_id}):#looping it until we find the data channel_id and append it to var
         re.append(i)
     df=pd.DataFrame(re)
-    df['channel_creation_date']=pd.to_datetime(df['channel_creation_date'])
-    df=df.drop(['_id'],axis=1)
-    df.to_sql(name='youtube_channell_details',
-            con=conn_sql,
-            index=False,
-            if_exists='append')
+    df['channel_creation_date']=pd.to_datetime(df['channel_creation_date'])#converting it to datetime format
+    df=df.drop(['_id'],axis=1)#dropping the unwanted colums
+    df.to_sql(name='youtube_channell_details',#table name where to send the data
+            con=conn_sql,#using the conn var
+            index=False,#if we want to send index or not
+            if_exists='append')#sending all the data at once to sql
     return a
-
-def youtube_playlist(youtube,channel_id):
-    coll=sample['playlistdetails'] 
-    data2=[]
+#def youtube_data_sql(channel_id) used to send channel details to sql 
+3)def youtube_playlist(youtube,channel_id):
+    coll=sample['playlistdetails'] #creating a variable so to insert the data into mongo db
+    data2=[]#var for appending
     request = youtube.playlists().list(part="snippet,contentDetails",channelId=channel_id,maxResults=50)
     response = request.execute()
         
-    for item in response['items']:
+    for item in response['items']:#it would only 50 videos as per youtube api guidelines
         data1=dict(playlist_name=item['snippet']['title'],
                         playlist_idd=item['id'],
                         channel_id=item['snippet']['channelId'],
                         videos_in_playlist=item['contentDetails']['itemCount'])
         coll.insert_one(data1)
         data2.append(data1)
-    next_page_token=response.get('nextPageToken')
-    while next_page_token is not None:
+    next_page_token=response.get('nextPageToken')#getting the next page response if there is any
+    while next_page_token is not None:#using the while loop till the next page token is not none
         request = youtube.playlists().list(part="snippet,contentDetails",channelId=channel_id,maxResults=50,pageToken=next_page_token)
         response = request.execute()
         for item in response['items']:
-            data1=dict(playlist_name=item['snippet']['title'],
-                            playlist_idd=item['id'],
-                            channel_id=item['snippet']['channelId'],
-                            videos_in_playlist=item['contentDetails']['itemCount'])
+            data1=dict(playlist_name=item['snippet']['title'],#playlist name
+                            playlist_idd=item['id'],#uniques id of playlist
+                            channel_id=item['snippet']['channelId'],#channel id
+                            videos_in_playlist=item['contentDetails']['itemCount'])#no of videos in playlist
             coll.insert_one(data1)
             data2.append(data1)
         next_page_token=response.get('nextPageToken')
     df=pd.DataFrame(data2)
     return df
-
-def youtube_playlistdata_sql(channel_id):
+#def youtube_playlist(youtube,channel_id) used to retrieve playlist information
+4)def youtube_playlistdata_sql(channel_id):
     re=[]
     a='Sucessful'
     #sample=conn['youtube']
@@ -109,8 +113,8 @@ def youtube_playlistdata_sql(channel_id):
             index=False,
             if_exists='append')
     return a
-
-def youtube_data_playlistid(youtube,channel_id):
+#def youtube_playlistdata_sql(channel_id) used to send data in sql
+5)def youtube_data_playlistid(youtube,channel_id):
     all_data=[]
     request = youtube.channels().list(part="snippet,contentDetails,statistics",id=channel_id)
     response = request.execute()
@@ -120,16 +124,16 @@ def youtube_data_playlistid(youtube,channel_id):
     except Exception:
         print('')
     return all_data
-
+#def youtube_data_playlistid(youtube,channel_id) using it to retrive only the playlist id from the response and then store in a var
 try:
     playlist_id=youtube_data_playlistid(youtube,channel_id)
 except Exception:
     print('')
 
-def youtube_playlist_videos(youtube,playlist_id):
+6)def youtube_playlist_videos(youtube,playlist_id):
     data5=[]
     coll=sample['playlist_details']
-    for i in range(len(playlist_id)):
+    for i in range(len(playlist_id)):#looping through the playlist id
         result=playlist_id[i]
         request = youtube.playlistItems().list(part="snippet,contentDetails",maxResults=50,playlistId=result)
         response = request.execute()
@@ -149,39 +153,22 @@ def youtube_playlist_videos(youtube,playlist_id):
             request = youtube.playlistItems().list(part="snippet,contentDetails",maxResults=50,playlistId=result,pageToken=next_page_token)
             response = request.execute()
             for item in response['items']:
-                data3=dict(video_id=item['contentDetails']['videoId'],
-                            playlist_id=item['snippet']['playlistId'],
-                            channel_id=item['snippet']['channelId'],
-                            video_title=item['snippet']['title'],
-                            video_uploaded_date=item['contentDetails']['videoPublishedAt'],
-                            channel_name=item['snippet']['channelTitle'],
-                            video_description=item['snippet']['description'])
+                data3=dict(video_id=item['contentDetails']['videoId'],#unique id of a video
+                            playlist_id=item['snippet']['playlistId'],#unique id of channel playlist with we can retrieve all the video ids
+                            channel_id=item['snippet']['channelId'],#channel_id
+                            video_title=item['snippet']['title'],#title of video
+                            video_uploaded_date=item['contentDetails']['videoPublishedAt'],#uploaded date
+                            channel_name=item['snippet']['channelTitle'],#channel title
+                            video_description=item['snippet']['description'])#description of video
                 coll.insert_one(data3)
                 data5.append(data3)
             next_page_token=response.get('nextPageToken')
         df=pd.DataFrame(data5)
         df['video_uploaded_date']=pd.to_datetime(df['video_uploaded_date'])  
     return df
+#def youtube_playlist_videos(youtube,playlist_id) for the retrieval of all videos details in a channel and displaying it and sending it to mongo db
 
-
-def youtube_playlist_video_data_sql(playlist_id):
-    re=[]
-    a='sucessful'
-    #sample=conn['youtube']
-    coll_var=sample.playlist_details
-    for i in coll_var.find({"playlist_id":playlist_id}):
-        re.append(i)
-    df=pd.DataFrame(re)
-    #try:
-    df['video_uploaded_date']=pd.to_datetime(df['video_uploaded_date'])  
-    df=df.drop(['_id','video_description','video_uploaded_date'],axis=1)
-    df.to_sql(name='youtube_playlist_video_details',
-            con=conn_sql,
-            index=False,
-            if_exists='append')
-    return a
-
-def youtube_playlist_videos_id(youtube,playlist_id):
+7)def youtube_playlist_videos_id(youtube,playlist_id):
 
     data5=[]
     for i in range(len(playlist_id)):
@@ -198,26 +185,26 @@ def youtube_playlist_videos_id(youtube,playlist_id):
                 data5.append(item['contentDetails']['videoId'])
             next_page_token=response.get('nextPageToken')  
     return data5
-
+#def youtube_playlist_videos_id(youtube,playlist_id) for the retrieval of videos id and storing it in a var
 try:
     videos_id=youtube_playlist_videos_id(youtube,playlist_id)
 except Exception:
     print('')
 
-def comments_details(youtube,videos_id):
+8)def comments_details(youtube,videos_id):
     coll=sample['comment_details']
     data6=[]
-    try:
-        for i in range(len(videos_id)):
+    try:#what if in a video the comments are disabled
+        for i in range(len(videos_id)):#looping through the videos you can increase the max results to 100 as per your choice.
             result=videos_id[i]
             request = youtube.commentThreads().list(part="snippet,replies",maxResults=1,videoId=result)
             response = request.execute()
             for item in response['items']:
-                data=dict(comment_id=item['id'],
-                        video_id=item['snippet']['videoId'],
-                        comment_on_video=item['snippet']['topLevelComment']['snippet']['textDisplay'], 
-                        comment_made_by=item['snippet']['topLevelComment']['snippet']['authorDisplayName'],
-                        comment_date=item['snippet']['topLevelComment']['snippet']['publishedAt'])
+                data=dict(comment_id=item['id'],#unique id of a comment
+                        video_id=item['snippet']['videoId'],#videoid
+                        comment_on_video=item['snippet']['topLevelComment']['snippet']['textDisplay'],#text on comment 
+                        comment_made_by=item['snippet']['topLevelComment']['snippet']['authorDisplayName'],#who made comment
+                        comment_date=item['snippet']['topLevelComment']['snippet']['publishedAt'])#when comment was made
                 coll.insert_one(data)
                 data6.append(data)
             #next_page_token=response.get('nextPageToken')
@@ -237,10 +224,9 @@ def comments_details(youtube,videos_id):
     except Exception:
         print('')    
     df=pd.DataFrame(data6)
-    #df['comment_date']=pd.to_datetime(df['comment_date'])
     return df
-    
-def youtube_comment_details_data_sql(videos_id):
+  #def comments_details(youtube,videos_id) used to get the comment details  
+9)def youtube_comment_details_data_sql(videos_id):
     re=[]
     a='Sucessfull'
     coll_var=sample.comment_details
@@ -257,8 +243,8 @@ def youtube_comment_details_data_sql(videos_id):
             index=False,
             if_exists='append')
     return a
-
-def videos_info(youtube,videos_id): 
+#def youtube_comment_details_data_sql(videos_id) send the data to sql
+10)def videos_info(youtube,videos_id): 
     coll=sample['videos_details']
     data6=[]
     for i in range(len(videos_id)):
@@ -266,18 +252,18 @@ def videos_info(youtube,videos_id):
         request = youtube.videos().list(part="snippet,contentDetails,statistics",maxResults=50,id=result)
         response = request.execute()
         for item in response['items']:
-            data3=dict(video_id=item['id'],
-                        channel_id=item['snippet']['channelId'],
-                        video_title=item['snippet']['title'], 
-                        video_description=item['snippet']['description'],
-                        video_creation_date=item['snippet']['publishedAt'],
-                        video_duration=item['contentDetails']['duration'],
-                        views_count=item['statistics']['viewCount'],
-                        likes_count=item['statistics']['likeCount'],
-                        favourite_count=item['statistics']['favoriteCount'],
-                        comment_count=item['statistics']['commentCount'],
-                        thumbnail_of_video=item['snippet']['thumbnails']['default']['url'],
-                        caption_status=item['contentDetails']['caption'])
+            data3=dict(video_id=item['id'],# unique video id 
+                        channel_id=item['snippet']['channelId'],#channel_id
+                        video_title=item['snippet']['title'], #video title
+                        video_description=item['snippet']['description'],#description of vide
+                        video_creation_date=item['snippet']['publishedAt'],#when was video uploaded
+                        video_duration=item['contentDetails']['duration'],#video time
+                        views_count=item['statistics']['viewCount'],#no of views
+                        likes_count=item['statistics']['likeCount'],#no of likes
+                        favourite_count=item['statistics']['favoriteCount'],#no of favourite count
+                        comment_count=item['statistics']['commentCount'],#no of comments in a video
+                        thumbnail_of_video=item['snippet']['thumbnails']['default']['url'],#thumbnaul of a video link
+                        caption_status=item['contentDetails']['caption'])#caption of video
             coll.insert_one(data3)
             data6.append(data3)
         next_page_token=response.get('nextPageToken')
@@ -306,8 +292,8 @@ def videos_info(youtube,videos_id):
     #df['video_duration']=pd.to_datetime(df['video_duration']).dt.total_seconds().astype(int)
     #df['video_duration']=df['video_duration']/3600
     return df
-
-def youtube_video_details_data_sql(channel_id):
+#def videos_info(youtube,videos_id) for the videos info 
+11)def youtube_video_details_data_sql(channel_id):
     re=[]
     a='Suceesfull'
     coll_var=sample.videos_details
@@ -322,8 +308,8 @@ def youtube_video_details_data_sql(channel_id):
             index=False,
             if_exists='append')
     return a
-
-if st.button('Retrive from youtube'):
+#def youtube_video_details_data_sql(channel_id) to send it to sql
+if st.button('Retrive from youtube'):#creating a button so that if it is clicked then all the defied functions would be called
     st.write(channel_details(youtube,channel_id))
     st.write(youtube_playlist(youtube,channel_id))
     st.write(youtube_playlist_videos(youtube,playlist_id))
@@ -334,4 +320,5 @@ if st.button('Migrate to sql'):
     st.write(youtube_data_sql(channel_id))
     st.write(youtube_playlistdata_sql(channel_id))
     st.write(youtube_video_details_data_sql(channel_id))
-    st.write(youtube_comment_details_data_sql(videos_id))        
+    st.write(youtube_comment_details_data_sql(videos_id))
+
