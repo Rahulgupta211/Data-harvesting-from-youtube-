@@ -8,13 +8,13 @@ import sqlalchemy
 
 from sqlalchemy import create_engine
 
-API_KEY='AIzaSyBuygZvIp_khy8Oy8keStwxjokXillcxw4'
+API_KEY='your api key'
 
 import pandas as pd
 
-conn=pymongo.MongoClient("mongodb+srv://duvidsm3:ronaldo19857@cluster0.gzzcm1z.mongodb.net/?retryWrites=true&w=majority")
+conn=pymongo.MongoClient("your mongo creds")
 
-conn_sql=sqlalchemy.create_engine('mysql+mysqlconnector://root:rahul@localhost:3306/youtube')
+conn_sql=sqlalchemy.create_engine('your database creds')
 
 from googleapiclient.discovery import build
 
