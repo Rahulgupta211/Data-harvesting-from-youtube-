@@ -16,11 +16,11 @@ import sqlalchemy
 from sqlalchemy import create_engine
 from googleapiclient.discovery import build
 
-API_KEY='AIzaSyBuygZvIp_khy8Oy8keStwxjokXillcxw4'#login to youtube data api and generate a key for the retrieval of data
+API_KEY='your api key'#login to youtube data api and generate a key for the retrieval of data
 
-conn=pymongo.MongoClient("mongodb+srv://duvidsm3:ronaldo19857@cluster0.gzzcm1z.mongodb.net/?retryWrites=true&w=majority")#creating a connection between python and mongo db
+conn=pymongo.MongoClient("your mongodb creds")#creating a connection between python and mongo db
 
-conn_sql=sqlalchemy.create_engine('mysql+mysqlconnector://root:rahul@localhost:3306/youtube')#creating a connection between sql and python
+conn_sql=sqlalchemy.create_engine('your sql creds')#creating a connection between sql and python
 
 api_service_name = "youtube"##declaring api name
 
